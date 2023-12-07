@@ -23,11 +23,16 @@ In this example, the calibration values of these four lines are 12, 38, 15, and 
 Consider your entire calibration document. What is the sum of all of the calibration values?
 */
 
-mod first;
-mod second;
+use std::fs::read_to_string;
 
-fn main() {
-   let input = "day1/assets/input";
-   println!("first result {}", first::puzzle(input));
-   println!("second result {}", second::puzzle(input));
+pub fn puzzle(input: &str) -> u32 {
+    read_to_string(input).unwrap().lines().map(|l| {
+        let d : Vec<char> = l.chars()
+        .filter(|c| c.is_digit(10))
+        .collect();
+        (d.first().unwrap().clone(), d.last().unwrap().clone())
+    })
+    .fold::<u32, _>(0, |acc, (f,l)| {
+        acc + format!("{}{}", f, l).parse::<u32>().unwrap()
+    })
 }
