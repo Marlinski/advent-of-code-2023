@@ -24,13 +24,16 @@ Consider your entire calibration document. What is the sum of all of the calibra
 */
 
 use std::fs::read_to_string;
+use apply::Apply;
 
 pub fn puzzle(input: &str) -> u32 {
     read_to_string(input).unwrap().lines().map(|l| {
-        let d : Vec<char> = l.chars()
+        l.chars()
         .filter(|c| c.is_digit(10))
-        .collect();
-        (d.first().unwrap().clone(), d.last().unwrap().clone())
+        .collect::<Vec<char>>()
+        .apply(|d|
+            (d.first().unwrap().clone(), d.last().unwrap().clone())
+        )
     })
     .fold::<u32, _>(0, |acc, (f,l)| {
         acc + format!("{}{}", f, l).parse::<u32>().unwrap()
