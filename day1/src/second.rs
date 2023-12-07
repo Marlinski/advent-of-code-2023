@@ -19,6 +19,8 @@ What is the sum of all of the calibration values?
 use std::fs::read_to_string;
 use regex::Regex;
 use regex::RegexSet;
+use apply::Apply;
+use apply::Also;
 
 pub fn puzzle(input: &str) -> u32 {
     read_to_string(input).unwrap().lines()
@@ -48,7 +50,7 @@ fn extract_first_and_last_digit(line: &str) -> (char,char) {
     let patterns = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
     let set = RegexSet::new(patterns).unwrap();
 
-    let mut matches: Vec<(usize,String)> = set.matches(line)
+    set.matches(line)
     .into_iter()
     .flat_map(|index| {
         let pattern = &patterns[index];
@@ -62,16 +64,15 @@ fn extract_first_and_last_digit(line: &str) -> (char,char) {
         .collect();
         ret
     })
-    .collect();
-
-    matches.sort_by(|(a1,_),(a2,_)| a1.cmp(a2) );
-
-    let ordered: Vec<char> = matches.into_iter()
+    .collect::<Vec<(usize,String)>>()
+    .also(|c| {
+        c.sort_by(|(a1,_),(a2,_)| a1.cmp(a2) );
+    })
+    .into_iter()
     .map(|(_,s)| s)
     .map(|s| str_to_digit(s.as_str()))
-    .collect();
-
-    (ordered.first().unwrap().clone(), ordered.last().unwrap().clone())
+    .collect::<Vec<char>>()
+    .apply(|o| (o.first().unwrap().clone(), o.last().unwrap().clone()))
 }
 
 
