@@ -93,10 +93,27 @@ Seed 13, soil 13, fertilizer 52, water 41, light 34, temperature 34, humidity 35
 So, the lowest location number in this example is 35.
 
 What is the lowest location number that corresponds to any of the initial seed numbers?
+
+--- Part Two ---
+Everyone will starve if you only plant such a small number of seeds. Re-reading the almanac, it looks like the seeds: line actually describes ranges of seed numbers.
+
+The values on the initial seeds: line come in pairs. Within each pair, the first value is the start of the range and the second value is the length of the range. So, in the first line of the example above:
+
+seeds: 79 14 55 13
+This line describes two ranges of seed numbers to be planted in the garden. The first range starts with seed number 79 and contains 14 values: 79, 80, ..., 91, 92. The second range starts with seed number 55 and contains 13 values: 55, 56, ..., 66, 67.
+
+Now, rather than considering four seed numbers, you need to consider a total of 27 seed numbers.
+
+In the above example, the lowest location number can be obtained from seed number 82, which corresponds to soil 84, fertilizer 84, water 84, light 77, temperature 45, humidity 46, and location 46. So, the lowest location number is 46.
+
+Consider all of the initial seed numbers listed in the ranges on the first line of the almanac. What is the lowest location number that corresponds to any of the initial seed numbers?
+
 */
 
 use std::fs::read_to_string;
 use regex::Regex;
+use std::sync::Arc;
+use std::thread;
 
 // a simple range with lookup function
 
@@ -149,7 +166,6 @@ struct Almanach {
    maps: Vec<DestinationMap>,
 }  
 
-
 fn parse_seeds(line: &str, almanach: &mut Almanach, state: &mut i32) {
    let re = Regex::new(r"\b\d+\b").unwrap();
    let seeds: Vec<u64> = re
@@ -164,6 +180,10 @@ fn parse_seeds(line: &str, almanach: &mut Almanach, state: &mut i32) {
 
    if line.contains(" map:") {
       *state += 1;
+      almanach.maps.push(
+         DestinationMap {
+            ranges: Vec::new()
+         });
       return;
    }
 }
@@ -189,6 +209,10 @@ fn parse_map(line: &str, almanach: &mut Almanach, state: &mut i32) {
 
    if line.contains(" map:") {
       *state += 1;
+      almanach.maps.push(
+         DestinationMap {
+            ranges: Vec::new()
+         });
       return;
    }
 }
@@ -199,16 +223,7 @@ fn load_almanach(input: &str) -> Almanach {
       maps: Vec::new(),
    };
 
-   // init all maps
-   for _i in 0..7 {
-      ret.maps.push(
-         DestinationMap {
-            ranges: Vec::new()
-         })
-   }
-
    let lines = read_to_string(input).unwrap();
-
    let mut state = -1;
    for line in lines.lines() {
       match state {
@@ -220,19 +235,77 @@ fn load_almanach(input: &str) -> Almanach {
    ret  
 }
 
-fn main() {
-   let input = "day5/assets/input";
-   let almanach = load_almanach(input);
+fn seed_to_location(seed: u64, almanach: &Almanach) -> u64 {
+   let mut i: u64 = seed;
+   for m in 0..7 {
+      i = almanach.maps[m].lookup(i)
+   }  
+   i
+}
 
+fn solve_puzzle_part_one(almanach: &Almanach) { 
    let mut lowest = u64::MAX;
-   for seed in almanach.seeds {
-      let mut i: u64 = seed;
-      for m in 0..7 {
-         i = almanach.maps[m].lookup(i)
-      }
+   for seed in &almanach.seeds {
+      let i = seed_to_location(*seed, almanach);
       if i < lowest {
          lowest = i;
       }
    }
    println!("lowest is {}",lowest);
+}
+
+/* ------------ part two ------------ */
+
+/* 
+   1809081164 seeds to try, each taking 6 lookups  
+
+   map 0 => total range is 4114855217 max is 662865138
+   map 1 => total range is 4270604933 max is 571426669
+   map 2 => total range is 3993472324 max is 286820892
+   map 3 => total range is 4099135953 max is 815715100
+   map 4 => total range is 3898760701 max is 587176321
+   map 5 => total range is 3859118751 max is 492194617
+   map 6 => total range is 4279575168 max is 382426498
+
+   so we are better off trying all seeds rather than trying all locations (also location space is unbounded).
+*/
+
+fn solve_puzzle_part_two(almanach: Almanach) {
+   let len = almanach.seeds.len()/2;
+   let almanach = Arc::new(almanach);
+   let mut handles = Vec::new();
+
+   for i in 0..len {
+      let almanach = almanach.clone();
+      let handle = thread::spawn(move || {
+         let mut local_lowest = u64::MAX;
+         let start = almanach.seeds[2*i];
+         let range  = almanach.seeds[2*i+1];
+         println!("searching {} seed starting from {}", range, start);
+         for seed in start..(start+range) {
+            let i = seed_to_location(seed, &almanach);
+            if i < local_lowest {
+               local_lowest = i;
+            }
+         }
+         local_lowest
+     });
+     handles.push(handle);
+   }
+
+   let mut lowest = u64::MAX;
+   for handle in handles.into_iter() {
+      let local_lowest = handle.join().unwrap();
+      println!("jobs completed, local lowest is {}", local_lowest);
+      if local_lowest < lowest {
+         lowest = local_lowest
+      }
+  }
+   println!("lowest is {}",lowest);
+}
+
+fn main() {
+   let input = "day5/assets/input";
+   let almanach = load_almanach(input);
+   solve_puzzle_part_two(almanach);
 }
