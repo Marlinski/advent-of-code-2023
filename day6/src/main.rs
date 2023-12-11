@@ -46,7 +46,7 @@ Time:        61     67     75     71
 Distance:   430   1036   1307   1150
 */
 
-type Race = (i32,i32);
+type Race = (i64,i64);
 type Races = Vec<Race>;
 
 fn load_test() -> Races {
@@ -87,22 +87,21 @@ fn load_race() -> Races {
  *  (x-x1)(x-x2) > 0
  */
 
-fn discriminant(a: i32,b: i32,c: i32) -> i32 {
+fn discriminant(a: i64,b: i64,c: i64) -> i64 {
    return b*b - 4*a*c;
 }
 
-fn roots(a: i32,b: i32,c: i32) -> (i32,i32) {
+fn roots(a: i64,b: i64,c: i64) -> (i64,i64) {
    let d =discriminant(a, b, c); 
    if d < 0 {
       panic!("no real roots");
    }
-   return ((-1*b+(f32::floor(f32::sqrt(d as f32)) as i32))/2*a,(-1*b-(f32::floor(f32::sqrt(d as f32)) as i32))/2*a)
+   return ((-1*b+(f64::floor(f64::sqrt(d as f64)) as i64))/2*a,(-1*b-(f64::floor(f64::sqrt(d as f64)) as i64))/2*a)
 }
 
-fn distance(x: i32, y:i32) -> i32 {
+fn distance(x: i64, y:i64) -> i64 {
    (y-x)*x
 }
-
 
 fn puzzle_part_one(races: &Races) {
    let mul = races
@@ -129,7 +128,48 @@ fn puzzle_part_one(races: &Races) {
    println!("mul is {}",mul);
 }
 
+/* ------------- part two ------------- */
+
+
+fn load_test_part_two() -> Races {
+   let mut ret = Vec::new();
+   ret.push((71530i64,940200i64));
+   ret
+}
+
+
+fn load_race_part_two() -> Races {
+   let mut ret = Vec::new();
+   ret.push((61677571i64,430103613071150i64));
+   ret
+}
+
+fn puzzle_part_two(races: &Races) {
+   let mul = races
+   .into_iter()
+   .map(|(y,z)| {
+      let y = y.clone();
+      let z = z.clone();
+
+      let a = -1;
+      let b = y;
+      let c = -1*z-1;
+
+      let (r1,r2) = roots(a.clone(),b.clone(),c.clone());
+      let (d1,d2) = (distance(r1,b), distance(r2, b));
+      println!("must beat: {} /// {} -> {}   {} -> {}", z, r1, d1, r2, d2);
+      
+      if d1 <= z {
+         r2-r1
+      } else {
+         r2-r1+1
+      }
+   })
+   .fold(0, |acc,v| acc+v);
+   println!("sum is {}",mul);
+}
+
 fn main() {
-   let races = load_race();
-   puzzle_part_one(&races)
+   let races = load_race_part_two();
+   puzzle_part_two(&races)
 }
