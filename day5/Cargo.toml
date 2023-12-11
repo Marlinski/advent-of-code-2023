@@ -6,3 +6,4 @@ authors = ["Marlinski <loiseau.lucien@gmail.com>"]
 
 [dependencies]
 regex = "1.5"
+rayon = "1.7"
