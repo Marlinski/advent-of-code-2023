@@ -71,6 +71,7 @@ Simultaneously start on every node that ends with A. How many steps does it take
 
 use std::fs::read_to_string;
 use std::collections::HashMap;
+use rayon::prelude::*;
 
 struct Node {
    name: String,
@@ -131,8 +132,73 @@ fn walk_part_one(map: &Map) {
    println!("steps: {}",steps);
 }
 
+/* ---------- part two ---------- */
+
+// I first tried brute force but after 2 hours I stopped the job and changed approach
+
+fn gcd(a: usize, b: usize) -> usize {
+   if b == 0 {
+       a
+   } else {
+       gcd(b, a % b)
+   }
+}
+
+fn lcm(a: usize, b: usize) -> usize {
+   a * b / gcd(a, b)
+}
+
+fn walk_part_two(map: &Map) {
+   let mut steps = 0;
+   let path: Vec<char> = map.path.chars().collect();
+
+   let mut starting_positions: Vec<String> = Vec::new();
+   for (k,_) in map.nodes.iter() {
+      if k.ends_with("A") {
+         starting_positions.push(k.clone());
+      }
+   }
+   println!("starting with {} positions:  {:?}", starting_positions.len(), starting_positions);
+
+   let mut ghosts: Vec<&Node> = starting_positions
+   .into_iter()
+   .map(|p| &map.nodes[p.as_str()])
+   .collect();
+
+   let mut ghost_cycles: Vec<usize> = vec![0; ghosts.len()];
+   loop {
+      for (i,g) in ghosts.iter().enumerate().filter(|(_,g)| g.name.ends_with("Z")) {
+         println!("{} ghost {} has reached {}",steps, i,g.name);
+         if ghost_cycles[i] == 0 {
+            ghost_cycles[i] = steps;
+         }
+      }
+
+      if !ghost_cycles.contains(&0) {
+         // we found all ghost cycles
+         break;
+      }
+
+      let next_move = path[steps % path.len()];
+      ghosts = ghosts.par_iter().map(|n| {
+         match next_move {
+            'L' => &map.nodes[n.left.as_str()],
+            'R' => &map.nodes[n.right.as_str()],
+            _ => panic!("forbidden move")
+         }
+      })
+      .collect();
+
+      steps += 1;
+   }
+
+   // all ghosts meet at the least common denominator over their Z-cycle
+   let lcm = ghost_cycles.into_iter().fold(1, |acc, x| lcm(acc, x));
+   println!("steps: {}",lcm);
+}
+
 fn main() {
    let input = "day8/assets/input";
    let map = load_map(input);
-   walk_part_one(&map);
+   walk_part_two(&map);
 }
