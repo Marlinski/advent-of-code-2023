@@ -114,6 +114,8 @@ use std::fs::read_to_string;
 use regex::Regex;
 use std::sync::Arc;
 use std::thread;
+use std::ops::Range;
+use rayon::prelude::*;
 
 // a simple range with lookup function
 
@@ -270,6 +272,7 @@ fn solve_puzzle_part_one(almanach: &Almanach) {
    so we are better off trying all seeds rather than trying all locations (also location space is unbounded).
 */
 
+
 fn solve_puzzle_part_two(almanach: Almanach) {
    let len = almanach.seeds.len()/2;
    let almanach = Arc::new(almanach);
@@ -304,8 +307,32 @@ fn solve_puzzle_part_two(almanach: Almanach) {
    println!("lowest is {}",lowest);
 }
 
+
+fn solve_puzzle_part_two_optimized(almanach: Almanach) {
+   let len = almanach.seeds.len()/2;
+   let almanach = Arc::new(almanach);
+   
+   let mut ranges = Vec::new();
+   for i in 0..len {
+      ranges.push(almanach.seeds[2*i]..(almanach.seeds[2*i]+almanach.seeds[2*i+1]));
+   }
+
+   let lowest = ranges
+   .par_iter()
+   .map(|r| {
+      r.clone().into_par_iter()
+      .map(|v| seed_to_location(v,&almanach))
+      .min()
+      .unwrap()
+   })
+   .min()
+   .unwrap();
+
+   println!("lowest is {}",lowest);
+}
+
 fn main() {
    let input = "day5/assets/input";
    let almanach = load_almanach(input);
-   solve_puzzle_part_two(almanach);
+   solve_puzzle_part_two_optimized(almanach);
 }
