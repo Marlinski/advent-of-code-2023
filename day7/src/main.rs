@@ -50,11 +50,34 @@ T55J5 and QQQJA are both three of a kind. QQQJA has a stronger first card, so it
 Now, you can determine the total winnings of this set of hands by adding up the result of multiplying each hand's bid with its rank (765 * 1 + 220 * 2 + 28 * 3 + 684 * 4 + 483 * 5). So the total winnings in this example are 6440.
 
 Find the rank of every hand in your set. What are the total winnings?
+
+
+--- Part Two ---
+To make things a little more interesting, the Elf introduces one additional rule. Now, J cards are jokers - wildcards that can act like whatever card would make the hand the strongest type possible.
+
+To balance this, J cards are now the weakest individual cards, weaker even than 2. The other cards stay in the same order: A, K, Q, T, 9, 8, 7, 6, 5, 4, 3, 2, J.
+
+J cards can pretend to be whatever card is best for the purpose of determining hand type; for example, QJJQ2 is now considered four of a kind. However, for the purpose of breaking ties between two hands of the same type, J is always treated as J, not the card it's pretending to be: JKKK2 is weaker than QQQQ2 because J is weaker than Q.
+
+Now, the above example goes very differently:
+
+32T3K 765
+T55J5 684
+KK677 28
+KTJJT 220
+QQQJA 483
+32T3K is still the only one pair; it doesn't contain any jokers, so its strength doesn't increase.
+KK677 is now the only two pair, making it the second-weakest hand.
+T55J5, KTJJT, and QQQJA are now all four of a kind! T55J5 gets rank 3, QQQJA gets rank 4, and KTJJT gets rank 5.
+With the new joker rule, the total winnings in this example are 5905.
+
+Using the new joker rule, find the rank of every hand in your set. What are the new total winnings?
 */
 
 use std::fs::read_to_string;
 
 
+/* part one
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 enum Card {
    As,
@@ -71,6 +94,25 @@ enum Card {
    Three,
    Two
 }
+*/
+
+// part two
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+enum Card {
+   As,
+   King,
+   Queen,
+   Trump,
+   Nine,
+   Eight,
+   Seven,
+   Six,
+   Five,
+   Four,
+   Three,
+   Two,
+   Joker
+}
 
 impl Card {
    fn value(&self) -> usize {
@@ -78,7 +120,7 @@ impl Card {
          Card::As => 14,
          Card::King=> 13,
          Card::Queen=> 12,
-         Card::Joker=> 11,
+         //Card::Joker=> 11,
          Card::Trump =>10,
          Card::Nine=> 9,
          Card::Eight=> 8,
@@ -88,6 +130,7 @@ impl Card {
          Card::Four=> 4,
          Card::Three=> 3,
          Card::Two=> 2,
+         Card::Joker=> 1, // part two
       }
    }
 }
@@ -143,6 +186,7 @@ enum HandType {
 }
 
 impl Hand {
+   /* part one
    fn hand_type(&self) -> HandType {
       let mut counter = [0;15];
       for c in self.0 {
@@ -172,6 +216,58 @@ impl Hand {
       }
 
       if counter[0] == 2 {
+         return HandType::Pair;
+      }
+
+      HandType::High
+   }
+   */
+
+   // part two
+   fn hand_type(&self) -> HandType {
+      let mut counter = [(Card::Two, 0);15];
+      for c in self.0 {
+         counter[c.value()].0 = c;
+         counter[c.value()].1 += 1;
+      }
+
+      counter.sort_by(|a, b| b.1.cmp(&a.1));
+      let counter: Vec<(Card,i32)> = counter.into_iter().filter(|x| x.1 != 0).collect();
+      
+      
+      let jokers = counter.iter().find(|&x| x.0 == Card::Joker).map_or(0, |&x| x.1);
+      let mut counter_without_joker: Vec<i32> = counter.into_iter().filter(|x| x.0 != Card::Joker).map(|x| x.1 ).collect();
+
+      if counter_without_joker.len() == 0 {
+         // five joker
+         return HandType::FiveOak;
+      } else {
+         // we distribute the jokers to the highest card
+         counter_without_joker[0] += jokers; 
+      }
+
+      if counter_without_joker[0] == 5 {
+         return HandType::FiveOak;
+      }
+
+      if counter_without_joker[0] == 4 {
+         return HandType::FourOak;
+      }
+
+      if counter_without_joker[0] == 3 && counter_without_joker[1] == 2 {
+         return HandType::FullHouse;
+      }
+      
+
+      if counter_without_joker[0] == 3 {
+         return HandType::ThreeOak;
+      }
+
+      if counter_without_joker[0] == 2 && counter_without_joker[1] == 2 {
+         return HandType::TwoPair;
+      }
+
+      if counter_without_joker[0] == 2 {
          return HandType::Pair;
       }
 
@@ -235,10 +331,8 @@ fn load_bids(input: &str) -> Bids {
 
 fn puzzle_part_one(bids: &mut Bids) {
    bids.sort_by(|d1,d2| d2.hand.cmp(&d1.hand));
-
    let sum = bids.into_iter().enumerate()
    .fold(0, |acc,(i,d)| acc + (i+1)*d.bid);
-
    println!("sum is {}", sum)
 }
 
