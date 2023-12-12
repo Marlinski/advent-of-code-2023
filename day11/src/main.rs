@@ -88,9 +88,19 @@ Between galaxy 8 and galaxy 9: 5
 In this example, after expanding the universe, the sum of the shortest path between all 36 pairs of galaxies is 374.
 
 Expand the universe, then find the length of the shortest path between every pair of galaxies. What is the sum of these lengths?
+
+--- Part Two ---
+The galaxies are much older (and thus much farther apart) than the researcher initially estimated.
+
+Now, instead of the expansion you did before, make each empty row or column one million times larger. That is, each empty row should be replaced with 1000000 empty rows, and each empty column should be replaced with 1000000 empty columns.
+
+(In the example above, if each empty row or column were merely 10 times larger, the sum of the shortest paths between every pair of galaxies would be 1030. If each empty row or column were merely 100 times larger, the sum of the shortest paths between every pair of galaxies would be 8410. However, your universe will need to expand far beyond these values.)
+
+Starting with the same initial image, expand the universe according to these new rules, then find the length of the shortest path between every pair of galaxies. What is the sum of these lengths?
+
  */
 
-use std::fs::read_to_string;
+use std::{fs::read_to_string, vec};
 
 type Universe = Vec<Vec<char>>;
 
@@ -178,8 +188,91 @@ fn puzzle_one(u: &Universe) {
   println!("{} pairs, sum of distance is {}", pairs, sum);
 }
 
+/* ------- part two --------- */
+
+
+
+fn expand_universe_2(u: Universe) -> Universe {
+  let mut expanded = Vec::new();
+
+  // expand horizontally
+  for line in u.iter() {
+    if line.iter().all(|c| *c == '.') {
+      expanded.push(vec!['X';line.len()]);
+    } else {
+      expanded.push(line.clone());
+    }
+  }
+
+  // expand vertically
+  for j in 0..u.len() {
+    // if vertical of i is all '.'
+    if (0..u.len()).into_iter()
+    .map(|i| u[i][j])
+    .all(|c| c == '.') {
+      (0..expanded.len()).into_iter()
+      .for_each(|i| {
+        expanded[i][j] = 'X';
+      });
+    }
+  }
+
+  expanded
+}
+
+
+fn puzzle_two(u: &Universe, factor: usize) {
+  let mut galaxies = Vec::new();
+  for (i,line) in u.iter().enumerate() {
+    for (j,c) in line.iter().enumerate() {
+      if c == &'#' {
+        galaxies.push((i,j));
+      }
+    }
+  }
+
+  let mut sum = 0;
+  for i in 0..galaxies.len() {
+    for j in i..galaxies.len() {
+      if galaxies[i] == galaxies[j] {
+        continue;
+      }
+
+      let (i1,j1) = galaxies[i];
+      let (i2,j2) = galaxies[j];
+      for wi in usize::min(i1,i2)..usize::max(i1,i2) {
+        if u[wi][0] == 'X' {
+          sum += factor
+        } else {
+          sum += 1
+        }
+      }
+
+      for wj in usize::min(j1,j2)..usize::max(j1,j2) {
+        if u[0][wj] == 'X' {
+          sum += factor
+        } else {
+          sum += 1
+        }
+      }
+    }
+  }
+
+  println!("sum of distance is {}", sum);
+}
+
+
+/* part one
 fn main() {
   let universe = load_universe("day11/assets/input");
   let universe = expand_universe(universe);
   puzzle_one(&universe);  
+}
+*/
+
+/* part two */
+fn main() {
+  let universe = load_universe("day11/assets/input");
+  let universe = expand_universe_2(universe);
+  puzzle_two(&universe, 1000000);  
 }
