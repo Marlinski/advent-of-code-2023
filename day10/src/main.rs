@@ -189,6 +189,7 @@ Figure out whether you have time to search for the nest by calculating the area 
 
 use std::fs::read_to_string;
 use std::ops::Index;
+use std::ops::IndexMut;
 
 #[derive(Debug,PartialEq, Eq)]
 enum Direction {
@@ -239,10 +240,17 @@ impl Coord {
   }
 }
 
+#[derive(Debug)]
 struct Maze {
   start: Coord,
   map: Vec<Vec<char>>
 } 
+
+impl Maze {
+  fn exists(&self, coord: &Coord) -> bool {
+    coord.x >= 0 && coord.y >= 0 && coord.x < (self.map.len() as i32 - 1) && coord.y < (self.map.len() as i32 - 1)
+  }
+}
 
 impl Index<&Coord> for Maze {
   type Output = char;
@@ -253,6 +261,12 @@ impl Index<&Coord> for Maze {
       } else {
         &self.map[coord.y as usize][coord.x as usize]
       }
+  }
+}
+
+impl IndexMut<&Coord> for Maze {
+  fn index_mut(&mut self, coord: &Coord) -> &mut Self::Output {
+    &mut self.map[coord.y as usize][coord.x as usize]
   }
 }
 
@@ -276,7 +290,7 @@ fn load_maze(input: &str) -> Maze {
   maze
 }
 
-fn walk_maze(maze: &Maze) {
+fn walk_maze(maze: &Maze) -> Vec<Coord> {
   let mut path = vec![maze.start.clone()];
 
   let mut now = maze.start.clone();
@@ -299,10 +313,127 @@ fn walk_maze(maze: &Maze) {
   }
 
   println!("size: {:?} mid: {}", path.len(), path.len()/2);
+
+  path
+}
+
+/*  ----------- part 2 ------------- */
+
+fn print_maze(maze: &Maze) {
+  for i in 0..maze.map.len() {
+    for j in 0..maze.map[i].len() {
+      print!("{}",maze.map[i][j]);
+    }
+    println!("")
+  }
+}
+
+fn upscale_maze(maze: &Maze) -> Maze {
+  let mut upscaled_maze = Maze{
+    start: Coord{x:2*maze.start.x,y:2*maze.start.y},
+    map: vec![vec!['.'; maze.map.len()*2];maze.map.len()*2],
+  };
+
+  // upscale the maze
+  for i in 0..maze.map.len() {
+    for j in 0..maze.map[i].len() {
+      upscaled_maze.map[2*i][2*j] = maze.map[i][j];
+      upscaled_maze.map[2*i][2*j+1] = '.';
+      upscaled_maze.map[2*i+1][2*j] = '.';
+      upscaled_maze.map[2*i+1][2*j+1] = '.';
+    }
+  }
+
+  // fill the gap horizontally
+  for i in 0..maze.map.len() {
+    maze.map[i].windows(2).enumerate().for_each(|(j,w)| {
+      if (w[0] == '-' || w[0] == 'F' || w[0] == 'L' || w[0] == 'S') && (w[1] == 'S' || w[1] == '-' || w[1] == '7' || w[1] == 'J') {
+        upscaled_maze.map[2*i][2*j+1] = '-';
+      }
+    })
+  }  
+
+  // fill the gap vertically (the maze is squared)
+  for i in 0..maze.map.len()-1 {
+    for j in 0..maze.map.len() {
+      let u = maze.map[i][j];
+      let d = maze.map[i+1][j];
+      if (u == '|' || u == 'F' || u == '7' || u == 'S') && (d == 'S' || d == '|' || d == 'J' || d == 'L') {
+        upscaled_maze.map[2*i+1][2*j] = '|';
+     }
+    }
+  }
+  
+  upscaled_maze
+}  
+
+
+fn downscale_maze(maze: &Maze) -> Maze {
+  let mut downscaled = Maze{
+    start: Coord{x:maze.start.x/2,y:maze.start.y/2},
+    map: vec![vec!['.'; maze.map.len()/2];maze.map.len()/2],
+  };
+
+  for i in 0..maze.map.len()/2 {
+    for j in 0..maze.map[i].len()/2 {
+      downscaled.map[i][j] = maze.map[2*i][2*j]
+    }
+  }
+
+  downscaled
+}
+
+fn color_maze(maze: &Maze, path: &Vec<Coord>) -> Maze {
+  let mut colored = Maze{
+    start: Coord{x:maze.start.x,y:maze.start.y},
+    map: vec![vec!['.'; maze.map.len()];maze.map.len()],
+  };
+
+  // color the path
+  for p in path {
+    colored[p] = 'X';
+  }
+
+  // color all the borders
+  let mut to_color: Vec<Coord> = (0..colored.map.len()-1).into_iter().flat_map(|i| {
+    vec![
+      Coord{x: 0 as i32, y:i as i32},
+      Coord{x: i as i32, y:0},
+      Coord{x: colored.map.len() as i32 - 1, y:i as i32},
+      Coord{x: i as i32, y:colored.map.len() as i32 - 1}
+    ]
+  })
+  .filter(|c| { colored[c] == '.' })
+  .collect();
+  
+  loop {
+    if to_color.len() == 0 {
+      break;
+    }
+
+    let c = to_color.pop().unwrap();
+    colored[&c] = 'C';
+
+    vec![c.up(), c.down(), c.left(), c.right()]
+    .into_iter()
+    .filter(|c| colored.exists(c))
+    .filter(|c| { colored[c] == '.' })
+    .for_each(|c| to_color.push(c));
+  }
+
+  colored
 }
 
 fn main() {
   let input = "day10/assets/input";
   let maze = load_maze(input);
-  walk_maze(&maze);
+  let _ = walk_maze(&maze);
+
+  let upscaled = upscale_maze(&maze);
+  let path = walk_maze(&upscaled);
+  let colored = color_maze(&upscaled, &path);
+  let downscaled = downscale_maze(&colored);
+
+  let sum: i32 = downscaled.map.iter().flat_map(|l| l).filter(|c| **c == '.').map(|_| 1).sum();
+  println!("sum is {}", sum);
 }
