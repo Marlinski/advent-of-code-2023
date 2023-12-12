@@ -424,10 +424,105 @@ fn color_maze(maze: &Maze, path: &Vec<Coord>) -> Maze {
   colored
 }
 
+/*  ----------- part 2  - second and simpler approach ------------- */
+
+fn color_right(maze: &Maze) {
+  // first we walk the maze as before
+  let mut path = vec![maze.start.clone()];
+  let mut now = maze.start.clone();
+  let mut dir = Direction::UP;
+  let mut to_color= Vec::new();
+  loop {
+    now = match dir {
+      Direction::UP => now.up(),
+      Direction::DOWN => now.down(),
+      Direction::LEFT => now.left(),
+      Direction::RIGHT => now.right(),
+    };
+    
+    if now == maze.start {
+      break;
+    }
+    
+    // schedule to color right of border (before rotation)
+    match dir {
+      Direction::UP => to_color.push(now.right()),
+      Direction::DOWN => to_color.push(now.left()),
+      Direction::LEFT => to_color.push(now.up()),
+      Direction::RIGHT => to_color.push(now.down()),
+    };
+
+    dir = dir.rotate(maze[&now]);
+    path.push(now.clone());
+
+    // schedule to color right of border (after rotation)
+    match dir {
+      Direction::UP => to_color.push(now.right()),
+      Direction::DOWN => to_color.push(now.left()),
+      Direction::LEFT => to_color.push(now.up()),
+      Direction::RIGHT => to_color.push(now.down()),
+    };
+  }
+   
+  // then we color the maze
+  let mut colored = Maze{
+    start: Coord{x:maze.start.x,y:maze.start.y},
+    map: vec![vec!['.'; maze.map.len()];maze.map.len()],
+  };
+
+  for p in path.iter() {
+    colored[p] = 'X';
+  }
+
+  let mut to_color: Vec<Coord> = to_color.into_iter()
+  .filter(|c| colored.exists(c))
+  .filter(|c| { colored[c] == '.' })
+  .collect();
+
+  loop {
+    if to_color.len() == 0 {
+      break;
+    }
+
+    let c = to_color.pop().unwrap();
+    colored[&c] = 'C';
+    
+    vec![c.up(), c.down(), c.left(), c.right()]
+    .into_iter()
+    .filter(|c| colored.exists(c))
+    .filter(|c| { colored[c] == '.' })
+    .for_each(|c| to_color.push(c));
+  }
+
+  // count the colored cells
+  let mut inside = 0;
+  let mut outside = 0;
+  for i in 0..colored.map.len() {
+    for j in 0..colored.map[i].len() {
+      match colored.map[i][j] {
+        '.' => outside += 1,
+        'C' => inside += 1,
+        _ => {}
+      }
+    }
+  }
+  println!("inside: {} outside: {}", inside, outside);
+}
+
+
+/* part 1
 fn main() {
   let input = "day10/assets/input";
   let maze = load_maze(input);
-  let _ = walk_maze(&maze);
+  let path = walk_maze(&maze);
+}
+*/
+
+/* part 2 
+fn main() {
+  let input = "day10/assets/input";
+  let maze = load_maze(input);
+  let path = walk_maze(&maze);
 
   let upscaled = upscale_maze(&maze);
   let path = walk_maze(&upscaled);
@@ -436,4 +531,12 @@ fn main() {
 
   let sum: i32 = downscaled.map.iter().flat_map(|l| l).filter(|c| **c == '.').map(|_| 1).sum();
   println!("sum is {}", sum);
+}
+*/
+
+/* part 2 - second and simpler take*/
+fn main() {
+  let input = "day10/assets/input";
+  let maze = load_maze(input);
+  color_right(&maze);
 }
