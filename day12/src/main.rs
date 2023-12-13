@@ -68,13 +68,41 @@ In this example, the number of possible arrangements for each row is:
 Adding all of the possible arrangement counts together produces a total of 21 arrangements.
 
 For each row, count all of the different arrangements of operational and broken springs that meet the given criteria. What is the sum of those counts?
- */
 
- use std::{fs::read_to_string, vec};
+--- Part Two ---
+As you look out at the field of springs, you feel like there are way more springs than the condition records list. When you examine the records, you discover that they were actually folded up this whole time!
 
- type Record = Vec<(Vec<char>,Vec<usize>)>;
+To unfold the records, on each row, replace the list of spring conditions with five copies of itself (separated by ?) and replace the list of contiguous groups of damaged springs with five copies of itself (separated by ,).
+
+So, this row:
+
+.# 1
+Would become:
+
+.#?.#?.#?.#?.# 1,1,1,1,1
+The first line of the above example would become:
+
+???.###????.###????.###????.###????.### 1,1,3,1,1,3,1,1,3,1,1,3,1,1,3
+In the above example, after unfolding, the number of possible arrangements for some rows is now much larger:
+
+???.### 1,1,3 - 1 arrangement
+.??..??...?##. 1,1,3 - 16384 arrangements
+?#?#?#?#?#?#?#? 1,3,1,6 - 1 arrangement
+????.#...#... 4,1,1 - 16 arrangements
+????.######..#####. 1,6,5 - 2500 arrangements
+?###???????? 3,2,1 - 506250 arrangements
+After unfolding, adding all of the possible arrangement counts together produces 525152.
+
+Unfold your condition records; what is the new sum of possible arrangement counts?
+*/
+
+use std::{fs::read_to_string, vec};
+
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+
+type Record = Vec<(Vec<char>,Vec<usize>)>;
  
- fn load_records(input: &str) -> Record  {
+fn load_records(input: &str) -> Record  {
    let mut record = Vec::new();
    let lines = read_to_string(input).unwrap();
    for line in lines.lines() {  
@@ -86,7 +114,7 @@ For each row, count all of the different arrangements of operational and broken 
    record
 }
 
-fn count_seq(n: u32) -> Vec<usize>{
+fn count_seq(n: u64) -> Vec<usize>{
     let mut n = n;
     let mut ret = Vec::new();
     let mut seq = 0;
@@ -104,10 +132,10 @@ fn count_seq(n: u32) -> Vec<usize>{
     ret
 }
 
-fn find_arrangement(spring: Vec<char>, cons: Vec<usize>) -> usize {
+fn find_arrangement(spring: &Vec<char>, cons: &Vec<usize>) -> u64 {
     // get masks
     let mut pos = Vec::new();
-    let mut mask_br = 0;
+    let mut mask_br = 0u64;
     for i in 0..spring.len() {
         match spring[i] {
             '.' => {},
@@ -118,14 +146,12 @@ fn find_arrangement(spring: Vec<char>, cons: Vec<usize>) -> usize {
         mask_br <<= 1;
     }
     mask_br >>= 1;
-amost 
 
     // we are brute-forcing all the ? position by trying all combinations
     let len = pos.len();
-    let combination = u32::pow(2,len as u32);    
-    //println!("start_from {:#b} width {} with {:?}",mask_br, spring.len(), pos);
-    let mut sum = 0;
-    for i in 0..combination {
+    let combination = u64::pow(2,len as u32);    
+    (0..combination).into_par_iter().map(|i| {
+        let mut sum = 0;
         let mut mask_br = mask_br;
         for j in 0..len {
             if (i & (1 << j)) != 0 {
@@ -133,20 +159,141 @@ amost
             }
         }
         let seq = count_seq(mask_br);
-        if seq == cons {
+        if &seq == cons {
             //println!("match {:#b}",mask_br);
             sum += 1
         }
-    }
-    //println!("{} with {:?} -> {}", spring.iter().collect::<String>(), cons, sum);
+        sum
+    }).sum()
+}
 
-    sum
+/*
+fn main() {
+    let input = "day12/assets/input";
+    let record = load_records(input);
+    
+    let total:usize = record.iter().map(|(s,c)| find_arrangement(s,c)).sum();
+    println!("sum of arrangement is {}", total);    
+}
+*/
+
+/* ------------- pat two ------------ */
+
+/*
+use apply::Also;
+
+fn find_arrangement_2(spring: &Vec<char>, cons: &Vec<usize>) -> u64 {
+    let single_arr = find_arrangement(spring, cons);
+
+    let left_s = spring.clone().also(|v| v.insert(0, '?'));
+    let left_arr =  find_arrangement(&left_s, cons);
+
+    let right_s = spring.clone().also(|v| v.push('?'));
+    let right_arr =  find_arrangement(&right_s, cons);
+
+    let double_s: Vec<char> = vec![spring.clone(),vec!['?'], spring.clone()].into_iter().flatten().collect();
+    let mut double_c = cons.clone();
+    double_c.extend(cons.iter());
+    let double_arr =  find_arrangement(&double_s, &double_c);
+
+    println!("{}  ?... -> {}   ...? -> {}  ...?... -> {}", single_arr, left_arr, right_arr, double_arr);
+
+    let mut res = 0;
+    if single_arr * left_arr == double_arr {
+        res = single_arr*u64::pow(left_arr, 4);
+        //println!("{}  ?... -> {}   ...? -> {}   // LEFT {}", single_arr, left_arr, right_arr, res);
+        return res;
+    }
+    if single_arr * right_arr == double_arr {
+        res = single_arr*u64::pow(right_arr, 4);
+        //println!("{}  ?... -> {}   ...? -> {}   // RIGHT {}", single_arr, left_arr, right_arr, res);
+        return res;
+    }
+
+    println!("I am not sure what to do!!");
+    single_arr*u64::pow(single_arr, 4)
+}
+
+// solution is NOT 723071774775
+// solution is NOT 720117864689
+// solution is NOT 1086312043219
+// solution is NOT 1086037069383
+*/
+
+fn expand<T>(v: &Vec<T>, sep: Option<T>, n: usize) -> Vec<T> 
+where T: Clone
+{
+    vec![v].into_iter()
+    .cycle().take(n)
+    .enumerate()
+    .map(|(i,v)| {
+      match &sep {
+        Some(t) => {
+            let mut v = v.clone();
+            if i < n-1 {
+                v.push(t.clone());   
+            }
+            v
+        },
+        None =>   v.clone()
+      }
+    })
+    .flatten()
+    .collect()
+}
+
+use std::collections::HashMap;
+
+fn is_valid(gid: usize, ga: usize, c: &Vec<usize>) -> bool {
+    gid == c.len() || (gid == c.len() - 1 && ga == c[gid])
+}
+
+fn find_arrangement_2(s: &Vec<char>, c: &Vec<usize>) -> u64 {
+    let s = s.clone();
+    let c = c.clone();
+    
+    let mut arr: HashMap<(usize, usize), u64> = HashMap::new();
+    arr.insert((0, 0), 1);
+
+    for (_i, ch) in s.into_iter().enumerate() {
+        let mut next = Vec::new();
+        for (&(gid, ga), &arr_c) in arr.iter() {
+            if ch != '#' {
+                if ga == 0 {
+                    next.push((gid, ga, arr_c));
+                } else if ga == c[gid] {
+                    next.push((gid + 1, 0, arr_c));
+                }
+            }
+            if ch != '.' {
+                if gid < c.len() && ga < c[gid] {
+                    next.push((gid, ga + 1, arr_c));
+                }
+            }
+        }
+        arr.clear();
+        for &(gid, ga, arr_c) in next.iter() {
+            //println!("{} ({}) -> {} {} {}", _i, ch, gid, ga, arr_c);
+            *arr.entry((gid, ga)).or_insert(0) += arr_c;
+        }
+    }
+
+    arr.iter()
+    .filter(|&(&(gid,ga), _)| is_valid(gid,ga, &c))
+    .map(|(_, &v)| v)
+    .sum()
 }
 
 fn main() {
     let input = "day12/assets/input";
     let record = load_records(input);
-    
-    let total:usize = record.into_iter().map(|(s,c)| find_arrangement(s,c)).sum();
-    println!("sum of arrangement is {}", total);
+    let total:u64 = record.iter()
+    .map(|(s,c)| {
+        (expand(s, Some('?'), 5),expand(c, None, 5))
+    })
+    .map(|(s,c)| {
+        find_arrangement_2(&s,&c)
+    })
+    .sum();
+    println!("sum of arrangement is {}", total);         
 }

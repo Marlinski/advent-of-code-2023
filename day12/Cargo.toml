@@ -5,3 +5,5 @@ edition = "2021"
 authors = ["Marlinski <loiseau.lucien@gmail.com>"]
 
 [dependencies]
+rayon = "1.7"
+apply = "0.3.0"
