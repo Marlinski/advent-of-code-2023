@@ -66,22 +66,12 @@ type Pattern = Vec<Vec<char>>;
 type Valley = Vec<Pattern>;
 
 fn load_valley(input: &str) -> Valley {
-    let mut valley: Valley = Vec::new();
-    let mut pattern: Pattern = Vec::new();
     let lines = read_to_string(input).unwrap();
-    for line in lines.lines() {
-        if line.contains('#') || line.contains('.') {
-            pattern.push(line.chars().collect());
-        } else {
-            valley.push(pattern.clone());
-            pattern.clear();
-        }
-    }
-    if pattern.len() > 0 {
-        valley.push(pattern.clone());
-    }
-
-    valley
+    lines.split("\n\n").into_iter().map(|pattern| {
+        pattern.split("\n").into_iter()
+        .map(|line| line.chars().collect::<Vec<char>>())
+        .collect::<Pattern>()
+    }).collect::<Valley>()
 }
 
 fn rotate(p: &Pattern) -> Pattern {
@@ -92,39 +82,96 @@ fn rotate(p: &Pattern) -> Pattern {
     r
 }
 
-fn find_horizontal_mirror(p: &Pattern) -> Option<usize> {
+fn find_horizontal_mirror(p: &Pattern) -> Vec<usize> {
+    let mut ret = Vec::new();
     let h = p.len();
     for i in 1..=h/2 {
         // upper half
         if (0..i).all(|j| p[i-j-1] == p[i+j]) {
-            return Some(i);
+            ret.push(i);
         }
         // bottom half
         if (0..i).all(|j| p[h-1-i-j] == p[h-i+j]) {
-            return Some(h-i);
+            ret.push(h-i);
         }
     }
-    None
+    ret
 }
+
+/*
 
 fn main() {
     let valley = load_valley("day13/assets/input");
+    
     let sum_h: usize = valley.iter()
     .map(|p| find_horizontal_mirror(p))
-    .enumerate()
-    .inspect(|(i,v)| println!("H // {} -> {:?}",i,v))
-    .map(|(_,v)|  v)
     .flatten()
     .sum();
 
     let sum_v: usize = valley.iter()
     .map(|p| rotate(p))
     .map(|p| find_horizontal_mirror(&p))
-    .enumerate()
-    .inspect(|(i,v)| println!("V // {} -> {:?}",i,v))
-    .map(|(_,v)|  v)
     .flatten()
     .sum();
 
     println!("sum {}",100*sum_h+sum_v);
+}
+
+*/
+
+/* ----------- part two ---------- */
+
+use std::collections::HashSet;
+use itertools::Itertools;
+
+#[derive(Debug)]
+enum Smudge {
+    Horizontal(usize),
+    Vertical(usize)
+}
+
+fn find_horizontal_smudge(mut p: Pattern) -> Vec<usize> {
+    let h = p.len();
+    let w = p[0].len();
+    
+    let without_smudge = find_horizontal_mirror(&p);
+    (0..h).cartesian_product(0..w).flat_map(|(i,j)| {
+        let c = p[i][j];
+        p[i][j] = if c == '.' { '#' } else { '.' };
+        let h = find_horizontal_mirror(&p);
+        p[i][j] = c;
+        h
+    })
+    .collect::<HashSet<_>>().into_iter()
+    .filter(|h| !without_smudge.contains(h))
+    .collect()
+}
+
+fn find_smudge(p: &Pattern) -> Smudge {
+    let smudge = find_horizontal_smudge(p.clone());
+    if smudge.len() == 1 {
+        return Smudge::Horizontal(smudge[0]);
+    }
+
+    let smudge = find_horizontal_smudge(rotate(&p));
+    if smudge.len() == 1 {
+        return Smudge::Vertical(smudge[0]);
+    }
+
+    panic!("no smudges found!");
+}
+
+fn main() {
+    let valley = load_valley("day13/assets/input");
+    let sum: usize = valley.iter()
+    .map(|p| find_smudge(p))
+    .inspect(|s| println!("{:?}",s))
+    .fold(0, |acc,s| {
+        match s {
+            Smudge::Horizontal(h) => acc + 100*h,
+            Smudge::Vertical(v) => acc + v,
+        }
+    });
+
+    println!("sum {}",sum);
 }
