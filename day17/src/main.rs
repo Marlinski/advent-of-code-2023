@@ -120,14 +120,14 @@ Directing the ultra crucible from the lava pool to the machine parts factory, wh
     }
  }
  
- fn next_tile(i: usize, j: usize, dir: Direction, size: usize) -> Option<(usize,usize,Direction)> {
+ fn next_tile(i: usize, j: usize, dir: Direction, map: &Vec<Vec<u8>>) -> Option<(usize,usize,Direction)> {
      match dir {
-         Direction::UP    => if i == 0      { None } else { Some((i-1, j, Direction::UP))   },
-         Direction::DOWN  => if i == size-1 { None } else { Some((i+1, j, Direction::DOWN)) },
-         Direction::LEFT  => if j == 0      { None } else { Some((i, j-1, Direction::LEFT)) },
-         Direction::RIGHT => if j == size-1 { None } else { Some((i, j+1, Direction::RIGHT)) },
+         Direction::UP    => if i == 0              { None } else { Some((i-1, j, Direction::UP))   },
+         Direction::DOWN  => if i == map.len()-1    { None } else { Some((i+1, j, Direction::DOWN)) },
+         Direction::LEFT  => if j == 0              { None } else { Some((i, j-1, Direction::LEFT)) },
+         Direction::RIGHT => if j == map[0].len()-1 { None } else { Some((i, j+1, Direction::RIGHT)) },
      }
- }
+}
  
 fn load_map(input: &str) -> Vec<Vec<u8>>{
      read_to_string(input).unwrap().split("\n")
@@ -135,24 +135,18 @@ fn load_map(input: &str) -> Vec<Vec<u8>>{
      .collect::<Vec<Vec<u8>>>()
 }
 
-
 fn find_min_loss(entry: (usize,usize,Direction), map: &Vec<Vec<u8>>) -> usize{
-    let size = map.len();
     let mut state: HashMap<(usize,usize,Direction,usize),usize> = HashMap::new();
     let mut pq = PriorityQueue::new();
-    pq.push((Some(entry), 0, 0),Reverse(0));
+    pq.push((String::from("R"),Some(entry), 0, 0),Reverse(0));
     
     loop {
         if pq.is_empty() {
             break;
         }
 
-        let (( next, loss, straight), _) = pq.pop().unwrap();
-                
+        let (( walker_id, next, loss, straight), _) = pq.pop().unwrap();       
         if next.is_none() {
-            continue;
-        }
-        if straight == 3 {
             continue;
         }
         
@@ -165,29 +159,37 @@ fn find_min_loss(entry: (usize,usize,Direction), map: &Vec<Vec<u8>>) -> usize{
         
         state.insert((i,j,dir,straight), loss);
 
-        if (i,j) == (size-1,size-1) {
-            //println!("walker at destination: {} => {}",walker_id,loss);
+        if (i,j) == (map.len()-1, map[0].len()-1) && straight >= 3{
             break;
         }
 
-        pq.push((next_tile(i,j,dir,size), loss, straight+1),Reverse(loss));
-        match dir {
-            Direction::DOWN | Direction::UP => {
-                //println!("turning right");
-                pq.push((next_tile(i,j,Direction::RIGHT, size), loss, 0),Reverse(loss));
-                //println!("turning left");
-                pq.push((next_tile(i,j,Direction::LEFT,size), loss, 0),Reverse(loss));
-            },
-            Direction::LEFT | Direction::RIGHT => {
-                //println!("turning down");
-                pq.push((next_tile(i,j,Direction::DOWN,size), loss, 0),Reverse(loss));
-                //println!("turning up");
-                pq.push((next_tile(i,j,Direction::UP,size), loss, 0),Reverse(loss));
+        if straight < 9 {
+            pq.push((walker_id.clone()+dir.char(), next_tile(i,j,dir,map), loss, straight+1),Reverse(loss));
+        }
+        
+        if straight >= 3 || (i,j) == (0,0) {
+            match dir {
+                Direction::DOWN | Direction::UP => {
+                    //println!("turning right");
+                    pq.push((walker_id.clone()+"R", next_tile(i,j,Direction::RIGHT, map), loss, 0),Reverse(loss));
+                    //println!("turning left");
+                    pq.push((walker_id.clone()+"L", next_tile(i,j,Direction::LEFT,map), loss, 0),Reverse(loss));
+                },
+                Direction::LEFT | Direction::RIGHT => {
+                    //println!("turning down");
+                    pq.push((walker_id.clone()+"D", next_tile(i,j,Direction::DOWN,map), loss, 0),Reverse(loss));
+                    //println!("turning up");
+                    pq.push((walker_id.clone()+"U", next_tile(i,j,Direction::UP,map), loss, 0),Reverse(loss));
+                }
             }
         }
     }
 
-    *state.iter().filter(|(&(i,j,_,_),_)| (i,j) == (size-1,size-1)).map(|(_,v)| v).min().unwrap()
+    *state.iter()
+    .filter(|(&(i,j,_,s),_)| (i,j) == (map.len()-1,map[0].len()-1) && s >= 3)
+    .map(|(_,v)| v)
+    .min()
+    .unwrap()
 }
 
 fn main() {
