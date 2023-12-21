@@ -133,11 +133,12 @@ fn energizised(contraption: &mut Vec<Vec<Tile>>, entry_point: (usize, usize, Dir
 
         let (i,j,dir) = stack.pop().unwrap();
         let tile = &mut contraption[i][j];
+        
         if tile.energy.contains(&dir) {
             continue;
         }
-
         tile.energy.push(dir);
+
         match tile.c {
             '.'  => vec![next_tile(i,j,dir,contraption.len())],
             '\\' => match dir {
