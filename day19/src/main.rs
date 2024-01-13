@@ -49,10 +49,22 @@ The workflows are listed first, followed by a blank line, then the ratings of th
 Ultimately, three parts are accepted. Adding up the x, m, a, and s rating for each of the accepted parts gives 7540 for the part with x=787, 4623 for the part with x=2036, and 6951 for the part with x=2127. Adding all of the ratings for all of the accepted parts gives the sum total of 19114.
 
 Sort through all of the parts you've been given; what do you get if you add together all of the rating numbers for all of the parts that ultimately get accepted?
+
+--- Part Two ---
+Even with your help, the sorting process still isn't fast enough.
+
+One of the Elves comes up with a new plan: rather than sort parts individually through all of these workflows, maybe you can figure out in advance which combinations of ratings will be accepted or rejected.
+
+Each of the four ratings (x, m, a, s) can have an integer value ranging from a minimum of 1 to a maximum of 4000. Of all possible distinct combinations of ratings, your job is to figure out which ones will be accepted.
+
+In the above example, there are 167409079868000 distinct combinations of ratings that will be accepted.
+
+Consider only your list of workflows; the list of part ratings that the Elves wanted you to sort is no longer relevant. How many distinct combinations of ratings will be accepted by the Elves' workflows?
 */
 
 use std::fs::read_to_string;
 use std::collections::HashMap;
+
 
 /* ========== lexer and scanner =========== */
 
@@ -346,6 +358,98 @@ impl VM {
     }
 }
 
+
+/* ============ part two ========= */
+
+
+#[derive(Debug, Clone, Copy)]
+enum Comp {
+    Gt,
+    Lt
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Condition {
+    var: char,
+    op: Comp,
+    literal: i64,
+    not: bool
+}
+
+#[derive(Debug, Clone)]
+enum Node {
+    Return(bool),
+    Branch(Condition, Box<Node>, Box<Node>)
+}
+
+fn build_tree(fn_map: &HashMap<&str, &str>, terms: &[&str]) -> Node {
+    let term = terms[0];
+    let remain = &terms[1..];
+    if term.contains('>') {
+        let cond = term.split(">").collect::<Vec<_>>();
+        let var = cond[0].chars().nth(0).unwrap();
+        let cond = cond[1].split(":").collect::<Vec<_>>();
+        let literal = cond[0].parse::<i64>().unwrap();
+        let then = cond[1];
+        Node::Branch(Condition{var, op: Comp::Gt, literal, not: false}, Box::new(build_tree(fn_map, &vec![then])), Box::new(build_tree(fn_map, remain)))
+    } else if term.contains('<') {
+        let cond = term.split("<").collect::<Vec<_>>();
+        let var = cond[0].chars().nth(0).unwrap();
+        let cond = cond[1].split(":").collect::<Vec<_>>();
+        let literal = cond[0].parse::<i64>().unwrap();
+        let then = cond[1];
+        Node::Branch(Condition{var, op: Comp::Lt, literal, not: false}, Box::new(build_tree(fn_map, &vec![then])), Box::new(build_tree(fn_map, remain)))
+    } else if term == "A" {
+        Node::Return(true)
+    } else if term == "R" {
+        Node::Return(false)
+    } else {
+        if remain.len() != 0 {
+            panic!("this should not spark joy!")
+        }
+        let fn_call: Vec<&str> = fn_map[term].split(",").collect();
+        build_tree(fn_map, &fn_call)
+    }
+}
+
+fn build_ast(input: &str) -> Node{
+    let file_content = read_to_string(input).unwrap();
+    let fn_map: HashMap<&str, &str> = file_content.split("\n")
+    .take_while(|s| s.len() > 0)
+    .map(|s| {
+        let s: Vec<&str> = s.split("{").collect();
+        let name = s[0];
+        let s: Vec<&str> = s[1].split("}").collect();
+        let body = s[0];
+        (name,body)
+    }).collect();
+
+    let enter: Vec<&str> = fn_map["in"].split(",").collect();
+    build_tree(&fn_map, &enter)
+}
+
+fn build_constraints(ast: &Node, prefix: Vec<Condition>) -> Vec<Vec<Condition>> {
+    match ast {
+        Node::Return(true) => {
+            //println!("{:?}\n",prefix);
+            vec![prefix.clone()]
+        },
+        Node::Return(false) => vec![],
+        Node::Branch(condition, left, right) => {
+            let mut thenb = prefix.clone();
+            thenb.push(condition.clone());
+            let mut ret = build_constraints(left.as_ref(), thenb);
+
+            let mut elseb = prefix.clone();
+            let mut not_condition = condition.clone();
+            not_condition.not = true;
+            elseb.push(not_condition);
+            ret.extend(build_constraints(right.as_ref(), elseb));
+            ret
+        }
+    }
+}
+
 fn main() {
     let input = "day19/assets/input";    
     let instructions = parse(input);
@@ -364,4 +468,33 @@ fn main() {
         }
     });
     println!("sum: {}",vm.sum);
+
+    /* part 2 */
+    let ast = build_ast(input);
+    let ctx = build_constraints(&ast, vec![]);
+    let arr: i64 = ctx.iter().map(|p| {
+        let mut range_map = HashMap::<char, (i64,i64)>::new();
+        range_map.insert('x', (1,4001));
+        range_map.insert('m', (1,4001));
+        range_map.insert('a', (1,4001));
+        range_map.insert('s', (1,4001));
+        p.iter().for_each(|condition| {
+            let (cur_min, cur_max) = range_map[&condition.var];
+            range_map.insert(condition.var, 
+                match (condition.op,condition.not) {
+                    (Comp::Gt, false) => (cur_min.max(condition.literal+1), cur_max.max(condition.literal+2)),
+                    (Comp::Gt, true) => (cur_min.min(condition.literal), cur_max.min(condition.literal+1)),
+                    (Comp::Lt, false) => (cur_min.min(condition.literal-1), cur_max.min(condition.literal)),
+                    (Comp::Lt, true) => (cur_min.max(condition.literal), cur_max.max(condition.literal+1)),
+                });
+        });
+        let arr = range_map.iter().fold(1, |acc, (k,v)| {
+            println!("range for {}: [{}..{}[",k,v.0,v.1);
+            acc * (v.1 - v.0)
+        });
+        println!("arrangement = {}\n",arr);
+        arr
+    })
+    .sum();
+    println!("arrangement possible: {}", arr);
 }
