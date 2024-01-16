@@ -218,4 +218,26 @@ fn main() {
         (acc.0+b.0, acc.1+b.1)
     });
     println!("sum is {}",sum.0 * sum.1);
+
+    // graphviz visualization
+    for (name, module) in configuration.1.iter() {
+        let s = match module {
+            Module::FlipFlop(_) => name.clone() + &"[shape=circle]".to_string().clone(),
+            Module::Conjunction(_) => name.clone() + &"[shape=rect]".to_string().clone(),
+            Module::Broadcast() => name.clone(),
+        };
+        println!("{}",s);
+    }
+    for (from, to) in configuration.0.iter() {
+        println!("{} -> {}",from, to.join(","));
+    }
+
+    
+    for i in 0..1000000 {
+        let Module::Conjunction(ins) = configuration.1.get("bb").unwrap() else { panic!("ayah") };
+        if ins.iter().any(|(k,v)| *v == Pulse::High) {
+            println!("{}: {:?}",i, ins);
+        }
+        press_button(&mut configuration);
+    }
 }
